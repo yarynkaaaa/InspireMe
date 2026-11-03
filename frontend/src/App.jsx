@@ -14,7 +14,8 @@ import Footer from "./components/Footer";
 import useCreations from "./hooks/useCreations";
 import { backdrops } from "./data/backdrops";
 
-const QUOTE_ENDPOINT = "/api/generate";
+const API_BASE = import.meta.env.VITE_API_URL || ""; 
+const QUOTE_ENDPOINT = ${API_BASE}/api/generate;
 
 export default function App() {
   const cardRef = useRef(null);
