@@ -209,7 +209,7 @@ def generate_quote():
             prompt += f'\nIt must be clearly different from this one: "{previous}"'
 
         response = openai_client.responses.create(
-            model="gpt-4.1-nano",
+            model="gpt-4.1-mini",
             instructions=(
                 "You are the quote generator for InspireMe. "
                 "Write one short, original and beautiful motivational quote "
