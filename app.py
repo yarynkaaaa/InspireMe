@@ -13,7 +13,10 @@ from openai import OpenAI
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=[
+    "https://yarynkaaaa.github.io",  # production site (origin has no path)
+    "http://localhost:5173",         # local development
+])
 
 MAX_TOPIC_LENGTH = 80
 
