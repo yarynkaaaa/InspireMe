@@ -23,7 +23,7 @@ MAX_TOPIC_LENGTH = 80
 # One shared OpenAI client: no repeated setup, short timeout, a single retry
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai_client = (
-    OpenAI(api_key=OPENAI_API_KEY, timeout=3.0, max_retries=0)
+    OpenAI(api_key=OPENAI_API_KEY, timeout=6.0, max_retries=0)
     if OPENAI_API_KEY
     else None
 )
