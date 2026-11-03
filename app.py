@@ -23,7 +23,7 @@ MAX_TOPIC_LENGTH = 80
 # One shared OpenAI client: no repeated setup, short timeout, no retries
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai_client = (
-    OpenAI(api_key=OPENAI_API_KEY, timeout=6.0, max_retries=0)
+    OpenAI(api_key=OPENAI_API_KEY, timeout=20.0, max_retries=0)
     if OPENAI_API_KEY
     else None
 )
@@ -209,7 +209,7 @@ def generate_quote():
             prompt += f'\nIt must be clearly different from this one: "{previous}"'
 
         response = openai_client.responses.create(
-            model="gpt-4.1-mini",
+            model="gpt-4.1-nano",
             instructions=(
                 "You are the quote generator for InspireMe. "
                 "Write one short, original and beautiful motivational quote "
