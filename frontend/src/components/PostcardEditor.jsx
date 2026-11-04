@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Shuffle } from "lucide-react";
 import { backdrops } from "../data/backdrops";
 
+const API_URL = "https://inspire-me-jet.vercel.app";
+
 const fonts = [
   { id: "serif", label: "Serif", className: "font-serif" },
   { id: "sans", label: "Sans", className: "font-sans" },
@@ -27,7 +29,7 @@ export default function PostcardEditor({
 }) {
   const [fontId, setFontId] = useState("serif");
   const [colorId, setColorId] = useState("light");
-  const [photo, setPhoto] = useState(null); // random photo from Unsplash
+  const [photo, setPhoto] = useState(null);
   const [isPhotoLoading, setIsPhotoLoading] = useState(false);
   const latestRequest = useRef(0);
 
@@ -43,29 +45,43 @@ export default function PostcardEditor({
         style: style.id,
         exclude: excludeId,
       });
-      const res = await fetch(`/api/backdrop?${params}`);
-      if (!res.ok) throw new Error(`Server error ${res.status}`);
+
+      // Отримуємо фотографію з Vercel backend
+      const res = await fetch(`${API_URL}/api/backdrop?${params}`);
+
+      if (!res.ok) {
+        throw new Error(`Server error ${res.status}`);
+      }
+
       const data = await res.json();
 
-      if (requestId !== latestRequest.current) return; // a newer request won
+      if (requestId !== latestRequest.current) return;
 
       setPhoto({
         id: data.id,
-        // Served through our own backend so exporting to PNG isn't blocked by CORS
-        src: `/api/image-proxy?url=${encodeURIComponent(data.image)}`,
+
+        // Завантажуємо фото через backend proxy
+        // Це допомагає уникнути CORS-проблем під час експорту
+        src: `${API_URL}/api/image-proxy?url=${encodeURIComponent(data.image)}`,
+
         photographer: data.photographer,
         photographerUrl: data.photographer_url,
         unsplashUrl: data.unsplash_url,
       });
     } catch (err) {
-      console.error(err);
-      if (requestId === latestRequest.current) setPhoto(null); // fall back to the static image
+      console.error("Failed to load backdrop photo:", err);
+
+      if (requestId === latestRequest.current) {
+        setPhoto(null);
+      }
     } finally {
-      if (requestId === latestRequest.current) setIsPhotoLoading(false);
+      if (requestId === latestRequest.current) {
+        setIsPhotoLoading(false);
+      }
     }
   }, []);
 
-  // A new random photo every time a different backdrop category is chosen
+  // Завантажуємо нове фото, коли змінюється категорія фону
   useEffect(() => {
     loadPhoto(backdrop);
   }, [backdrop, loadPhoto]);
@@ -75,7 +91,7 @@ export default function PostcardEditor({
   return (
     <section id="postcard-editor" className="px-[5%] py-16 md:py-24 lg:py-28">
       <div className="container mx-auto">
-        {/* Postcard preview (this block is exported as the image) */}
+        {/* Postcard preview */}
         <div
           ref={cardRef}
           className="relative mx-auto aspect-[4/3] w-full max-w-5xl overflow-hidden rounded-2xl bg-secondary md:aspect-video"
@@ -87,7 +103,9 @@ export default function PostcardEditor({
               isPhotoLoading ? "opacity-60" : "opacity-100"
             }`}
           />
+
           <div className={`absolute inset-0 ${color.overlay}`} />
+
           <div className="relative flex h-full items-center justify-center p-6 text-center md:p-12">
             <p
               className={`max-w-3xl text-2xl font-bold leading-[1.2] tracking-tight md:text-4xl lg:text-5xl ${font.className} ${color.text}`}
@@ -97,7 +115,7 @@ export default function PostcardEditor({
           </div>
         </div>
 
-        {/* Photo credit (outside the exported card) */}
+        {/* Photo credit */}
         <div className="mx-auto mt-3 flex max-w-5xl flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-white/70">
             {photo ? (
@@ -125,6 +143,7 @@ export default function PostcardEditor({
               "\u00A0"
             )}
           </p>
+
           <button
             type="button"
             onClick={() => loadPhoto(backdrop, photo?.id)}
@@ -138,8 +157,10 @@ export default function PostcardEditor({
 
         {/* Controls */}
         <div className="mx-auto mt-8 flex max-w-5xl flex-col gap-6 md:mt-10 md:flex-row md:flex-wrap md:items-start md:gap-12">
+          {/* Font */}
           <div>
             <p className="mb-2 text-sm font-semibold text-white">Font</p>
+
             <div className="flex gap-2">
               {fonts.map((f) => (
                 <button
@@ -155,8 +176,10 @@ export default function PostcardEditor({
             </div>
           </div>
 
+          {/* Text colour */}
           <div>
             <p className="mb-2 text-sm font-semibold text-white">Text colour</p>
+
             <div className="flex gap-2">
               {colors.map((c) => (
                 <button
@@ -172,8 +195,10 @@ export default function PostcardEditor({
             </div>
           </div>
 
+          {/* Background */}
           <div>
             <p className="mb-2 text-sm font-semibold text-white">Background</p>
+
             <div className="flex flex-wrap gap-2">
               {backdrops.map((b) => (
                 <button
