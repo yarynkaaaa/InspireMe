@@ -1,3 +1,4 @@
+
 import os
 import random
 import time
@@ -7,34 +8,36 @@ import requests
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, request
 from flask_cors import CORS
-from openai import OpenAI  # the OpenAI library also works with Groq (compatible API)
+from openai import OpenAI
 
-# Load API keys from .env
+# Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
+
 CORS(app, origins=[
-    "https://yarynkaaaa.github.io",  # production site (origin has no path)
-    "http://localhost:5173",         # local development
+    "https://yarynkaaaa.github.io",
+    "http://localhost:5173",
 ])
 
 MAX_TOPIC_LENGTH = 80
 
-# Groq has an OpenAI-compatible API, so the same client library is used
-AI_API_KEY = os.getenv("GROQ_API_KEY")
-AI_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+# Google Gemini API configuration
+AI_API_KEY = os.getenv("GEMINI_API_KEY")
+AI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+
 ai_client = (
     OpenAI(
         api_key=AI_API_KEY,
-        base_url="https://api.groq.com/openai/v1",
-        timeout=10.0,
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+        timeout=20.0,
         max_retries=0,
     )
     if AI_API_KEY
     else None
 )
 
-# Topic categories: aliases, fallback quotes and the Unsplash search query
+# Topic categories: aliases, fallback quotes and Unsplash queries
 CATEGORIES = {
     "success": {
         "aliases": ["success", "succeed", "achievement"],
@@ -98,8 +101,7 @@ CATEGORIES = {
     },
 }
 
-# Unsplash search query for each backdrop style shown on the site
-# (the keys must match the ids in the frontend file src/data/backdrops.js)
+# Unsplash search queries for backdrop styles
 STYLE_QUERIES = {
     "nature": "foggy forest",
     "mountains": "mountains blue hour",
@@ -109,28 +111,36 @@ STYLE_QUERIES = {
     "autumn-street": "moody autumn street",
 }
 
-PHOTO_CACHE = {}  # style -> (timestamp, photos)
-PHOTO_CACHE_TTL = 3600  # seconds; keeps us well under Unsplash rate limits
+PHOTO_CACHE = {}
+PHOTO_CACHE_TTL = 3600
 
 
 def find_category(topic):
-    """Return the matching category for a topic, or None."""
+    """Return the matching category for a topic."""
     normalized = topic.lower().strip()
+
     for category in CATEGORIES.values():
         if any(alias in normalized for alias in category["aliases"]):
             return category
+
     return None
 
 
 def local_quote(topic, previous=""):
-    """Pick a quote from the local library, avoiding the previous one."""
+    """Pick a local quote, avoiding the previous one."""
     category = find_category(topic)
+
     if category:
         pool = category["quotes"]
     else:
-        pool = [q for c in CATEGORIES.values() for q in c["quotes"]]
+        pool = [
+            quote
+            for category in CATEGORIES.values()
+            for quote in category["quotes"]
+        ]
 
-    options = [q for q in pool if q != previous] or pool
+    options = [quote for quote in pool if quote != previous] or pool
+
     return random.choice(options)
 
 
@@ -140,7 +150,7 @@ def clean_topic(raw, default="success"):
 
 
 def format_photo(photo):
-    """Reduce an Unsplash photo object to the fields the frontend needs."""
+    """Format an Unsplash photo."""
     return {
         "id": photo["id"],
         "image": photo["urls"]["regular"],
@@ -157,14 +167,17 @@ def format_photo(photo):
 
 
 def search_unsplash(query, per_page):
-    """Search Unsplash and return formatted photos. Raises on failure."""
+    """Search Unsplash and return formatted photos."""
     access_key = os.getenv("UNSPLASH_ACCESS_KEY")
+
     if not access_key:
         raise RuntimeError("UNSPLASH_ACCESS_KEY is missing")
 
     response = requests.get(
         "https://api.unsplash.com/search/photos",
-        headers={"Authorization": f"Client-ID {access_key}"},
+        headers={
+            "Authorization": f"Client-ID {access_key}"
+        },
         params={
             "query": query,
             "per_page": per_page,
@@ -173,18 +186,29 @@ def search_unsplash(query, per_page):
         },
         timeout=15,
     )
+
     response.raise_for_status()
-    return [format_photo(p) for p in response.json().get("results", [])]
+
+    return [
+        format_photo(photo)
+        for photo in response.json().get("results", [])
+    ]
 
 
 def fetch_style_photos(style):
-    """Return a cached list of photos for a backdrop style."""
+    """Return cached photos for a backdrop style."""
     cached = PHOTO_CACHE.get(style)
+
     if cached and time.time() - cached[0] < PHOTO_CACHE_TTL:
         return cached[1]
 
-    photos = search_unsplash(STYLE_QUERIES[style], per_page=30)
+    photos = search_unsplash(
+        STYLE_QUERIES[style],
+        per_page=30
+    )
+
     PHOTO_CACHE[style] = (time.time(), photos)
+
     return photos
 
 
@@ -198,21 +222,26 @@ def health():
     return jsonify({"status": "ok"})
 
 
-# Generate a motivational quote
+# Generate a motivational quote using Google Gemini
 @app.route("/api/generate", methods=["POST"])
 def generate_quote():
     started = time.perf_counter()
+
     data = request.get_json(silent=True) or {}
+
     topic = clean_topic(data.get("topic"))
     previous = str(data.get("previous", "")).strip()[:300]
 
     try:
         if ai_client is None:
-            raise ValueError("GROQ_API_KEY is missing")
+            raise ValueError("GEMINI_API_KEY is missing")
 
         prompt = f"Write a motivational quote about: {topic}"
+
         if previous:
-            prompt += f'\nIt must be clearly different from this one: "{previous}"'
+            prompt += (
+                f'\nIt must be clearly different from this one: "{previous}"'
+            )
 
         response = ai_client.chat.completions.create(
             model=AI_MODEL,
@@ -226,26 +255,43 @@ def generate_quote():
                         "Reply with the quote only, without quotation marks."
                     ),
                 },
-                {"role": "user", "content": prompt},
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
             ],
             max_tokens=60,
             temperature=1.0,
         )
 
-        quote = (response.choices[0].message.content or "").strip().strip('"').strip()
-        if not quote:
-            raise ValueError("Empty response from the AI model")
+        quote = (
+            response.choices[0].message.content or ""
+        ).strip().strip('"').strip()
 
-        app.logger.info("Quote generated by AI in %.2fs", time.perf_counter() - started)
-        return jsonify({"topic": topic, "quote": quote, "source": "AI"})
+        if not quote:
+            raise ValueError("Empty response from Gemini")
+
+        app.logger.info(
+            "Quote generated by Gemini in %.2fs",
+            time.perf_counter() - started
+        )
+
+        return jsonify({
+            "topic": topic,
+            "quote": quote,
+            "source": "AI",
+        })
 
     except Exception as exc:
-        app.logger.exception("AI request failed, using local quote")
+        app.logger.exception(
+            "Gemini request failed, using local quote"
+        )
+
         return jsonify({
             "topic": topic,
             "quote": local_quote(topic, previous),
             "source": "local",
-            "error": type(exc).__name__,  # temporary, for debugging; remove later
+            "error": type(exc).__name__,
         })
 
 
@@ -255,64 +301,116 @@ def search_images():
     topic = clean_topic(request.args.get("topic"))
 
     category = find_category(topic)
-    query = category["image_query"] if category else topic
+
+    query = (
+        category["image_query"]
+        if category
+        else topic
+    )
 
     try:
         results = search_unsplash(query, per_page=6)
+
     except RuntimeError:
-        return jsonify({"error": "Unsplash API key is missing"}), 500
+        return jsonify({
+            "error": "Unsplash API key is missing"
+        }), 500
+
     except requests.RequestException:
         app.logger.exception("Unsplash request failed")
-        return jsonify({"error": "Could not fetch photos from Unsplash"}), 502
 
-    return jsonify({"topic": topic, "images": results, "total": len(results)})
+        return jsonify({
+            "error": "Could not fetch photos from Unsplash"
+        }), 502
+
+    return jsonify({
+        "topic": topic,
+        "images": results,
+        "total": len(results),
+    })
 
 
-# One random photo for a backdrop style (used by the postcard editor)
+# Random photo for a postcard backdrop
 @app.route("/api/backdrop", methods=["GET"])
 def random_backdrop():
     style = request.args.get("style", "")
     exclude = request.args.get("exclude", "")
 
     if style not in STYLE_QUERIES:
-        return jsonify({"error": "Unknown style"}), 400
+        return jsonify({
+            "error": "Unknown style"
+        }), 400
 
     try:
         photos = fetch_style_photos(style)
-    except Exception:
-        app.logger.exception("Could not load photos for style %s", style)
-        return jsonify({"error": "Could not load photos"}), 502
 
-    # Avoid showing the same photo twice in a row
-    options = [p for p in photos if p["id"] != exclude] or photos
+    except Exception:
+        app.logger.exception(
+            "Could not load photos for style %s",
+            style
+        )
+
+        return jsonify({
+            "error": "Could not load photos"
+        }), 502
+
+    options = [
+        photo for photo in photos
+        if photo["id"] != exclude
+    ] or photos
+
     if not options:
-        return jsonify({"error": "No photos found"}), 404
+        return jsonify({
+            "error": "No photos found"
+        }), 404
 
     return jsonify(random.choice(options))
 
 
-# Proxy for Unsplash images (so exporting to PNG isn't blocked by CORS)
+# Proxy for Unsplash images
 @app.route("/api/image-proxy", methods=["GET"])
 def image_proxy():
     url = request.args.get("url", "")
+
     parsed = urlparse(url)
 
-    if parsed.scheme != "https" or parsed.hostname != "images.unsplash.com":
-        return jsonify({"error": "Only images.unsplash.com URLs are allowed"}), 400
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname != "images.unsplash.com"
+    ):
+        return jsonify({
+            "error": "Only images.unsplash.com URLs are allowed"
+        }), 400
 
     try:
-        upstream = requests.get(url, timeout=15)
+        upstream = requests.get(
+            url,
+            timeout=15
+        )
+
         upstream.raise_for_status()
+
     except requests.RequestException:
         app.logger.exception("Image proxy failed")
-        return jsonify({"error": "Could not load the image"}), 502
+
+        return jsonify({
+            "error": "Could not load the image"
+        }), 502
 
     return Response(
         upstream.content,
-        mimetype=upstream.headers.get("Content-Type", "image/jpeg"),
-        headers={"Cache-Control": "public, max-age=86400"},
+        mimetype=upstream.headers.get(
+            "Content-Type",
+            "image/jpeg"
+        ),
+        headers={
+            "Cache-Control": "public, max-age=86400"
+        },
     )
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(
+        debug=True,
+        port=5000
+    )
