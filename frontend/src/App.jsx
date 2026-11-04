@@ -14,7 +14,9 @@ import Footer from "./components/Footer";
 import useCreations from "./hooks/useCreations";
 import { backdrops } from "./data/backdrops";
 
-const QUOTE_ENDPOINT = "/api/generate";
+// Підключення до backend на Vercel
+const API_URL = "https://inspire-me-jet.vercel.app";
+const QUOTE_ENDPOINT = `${API_URL}/api/generate`;
 
 export default function App() {
   const cardRef = useRef(null);
@@ -25,6 +27,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState("");
+
   const {
     creations,
     add: addCreation,
@@ -39,22 +42,34 @@ export default function App() {
     try {
       const res = await fetch(QUOTE_ENDPOINT, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic: newTopic, previous: quote }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          topic: newTopic,
+          previous: quote,
+        }),
       });
-      if (!res.ok) throw new Error(`Server error ${res.status}`);
+
+      if (!res.ok) {
+        throw new Error(`Server error ${res.status}`);
+      }
 
       const data = await res.json();
-      if (!data.quote) throw new Error("Empty response from server");
+
+      if (!data.quote) {
+        throw new Error("Empty response from server");
+      }
 
       setQuote(data.quote);
+
       setTimeout(() => {
         document
           .getElementById("quote")
           ?.scrollIntoView({ behavior: "smooth" });
       }, 100);
     } catch (err) {
-      console.error(err);
+      console.error("Quote generation error:", err);
       setQuoteError("Could not generate a quote. Please try again.");
     } finally {
       setIsLoading(false);
@@ -63,13 +78,16 @@ export default function App() {
 
   const handleDownload = async () => {
     if (!cardRef.current) return;
+
     setIsDownloading(true);
     setDownloadError("");
+
     try {
       const dataUrl = await toPng(cardRef.current, {
         pixelRatio: 2,
         cacheBust: true,
       });
+
       const link = document.createElement("a");
       link.download = "inspireme-postcard.png";
       link.href = dataUrl;
@@ -80,6 +98,7 @@ export default function App() {
         quality: 0.85,
         cacheBust: true,
       });
+
       addCreation({
         id: Date.now(),
         topic: topic.toLowerCase(),
@@ -104,24 +123,29 @@ export default function App() {
     <>
       <Navbar />
       <Hero />
+
       <Generator
         onGenerate={generateQuote}
         isLoading={isLoading}
         serverError={quoteError}
       />
+
       <QuoteResult
         quote={quote}
         topic={topic.toLowerCase()}
         onRegenerate={() => generateQuote(topic)}
         isLoading={isLoading}
       />
+
       <BackdropStyles onSelect={setBackdrop} />
+
       <PostcardEditor
         quote={quote}
         backdrop={backdrop}
         onBackdropChange={setBackdrop}
         cardRef={cardRef}
       />
+
       {quote && (
         <PostcardReady
           onDownload={handleDownload}
@@ -130,7 +154,9 @@ export default function App() {
           error={downloadError}
         />
       )}
+
       <MyCreations creations={creations} onDelete={removeCreation} />
+
       <HowItWorks />
       <About />
       <Footer />
