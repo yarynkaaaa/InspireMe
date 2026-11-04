@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 
+const BASE = import.meta.env.BASE_URL;
+
 const links = [
   { label: "Generator", href: "#generator" },
   { label: "Image styles", href: "#image-styles" },
@@ -17,9 +19,9 @@ export default function Navbar() {
       <nav className="mx-auto max-w-7xl rounded-[2rem] border border-white/20 bg-background/80 backdrop-blur">
         <div className="flex min-h-[4.5rem] items-center justify-between gap-6 px-5 md:min-h-[5.5rem] lg:px-10">
           {/* Logo */}
-          <a href="#" className="flex shrink-0 items-center">
+          <a href={`${BASE}`} className="flex shrink-0 items-center">
             <img
-              src="/logo.png"
+              src={`${BASE}logo.png`}
               alt="Inspire Me"
               className="h-12 w-auto md:h-16"
             />
@@ -36,6 +38,7 @@ export default function Navbar() {
                 {link.label}
               </a>
             ))}
+
             <a
               href="#generator"
               className="rounded-full bg-white px-6 py-3 text-lg font-medium text-black transition-colors hover:bg-accent"
@@ -69,6 +72,7 @@ export default function Navbar() {
                 {link.label}
               </a>
             ))}
+
             <a
               href="#generator"
               onClick={() => setIsOpen(false)}

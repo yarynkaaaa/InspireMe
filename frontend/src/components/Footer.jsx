@@ -1,3 +1,4 @@
+const BASE = import.meta.env.BASE_URL;
 
 const links = [
   { label: "Generator", href: "#generator" },
@@ -16,11 +17,11 @@ export default function Footer() {
     >
       <div className="container mx-auto">
         <div className="flex flex-col items-start justify-between gap-8 md:flex-row md:items-center">
-          
+
           {/* Logo */}
-          <a href="#" className="shrink-0">
+          <a href={BASE} className="shrink-0">
             <img
-              src="/logo.png"
+              src={`${BASE}logo.png`}
               alt="Inspire Me"
               className="h-12 w-auto md:h-14"
             />
